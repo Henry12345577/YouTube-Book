@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Books</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+    header {
+      background: #6200ee;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+    }
+    .container {
+      padding: 20px;
+    }
+    .book-list {
+      margin-top: 20px;
+    }
+    .book-item {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+    .controls button {
+      margin-right: 5px;
+      padding: 5px 10px;
+      border: none;
+      background: #6200ee;
+      color: white;
+      cursor: pointer;
+    }
+    .controls button:hover {
+      background: #3700b3;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>YouTube Books</h1>
+    <p>Create, Store, and Listen to Books</p>
+  </header>
+  <div class="container">
+    <h2>Create a Book</h2>
+    <input type="text" id="book-title" placeholder="Book Title" style="width: 100%; margin-bottom: 10px;">
+    <textarea id="book-content" placeholder="Write your book here..." rows="5" style="width: 100%;"></textarea>
+    <button id="save-book">Save Book</button>
+    <h2>Your Books</h2>
+    <div class="book-list" id="book-list"></div>
+  </div>
+
+  <script>
+    // IndexedDB Setup
+    let db;
+    const request = indexedDB.open('YouTubeBooksDB', 1);
+
+    request.onupgradeneeded = function(event) {
+      db = event.target.result;
+      if (!db.objectStoreNames.contains('books')) {
+        db.createObjectStore('books', { keyPath: 'id', autoIncrement: true });
+      }
+    };
+
+    request.onsuccess = function(event) {
+      db = event.target.result;
+      displayBooks();
+    };
+
+    request.onerror = function(event) {
+      console.error('Database error:', event.target.error);
+    };
+
+    // Save a book
+    document.getElementById('save-book').addEventListener('click', () => {
+      const title = document.getElementById('book-title').value.trim();
+      const content = document.getElementById('book-content').value.trim();
+
+      if (title && content) {
+        const transaction = db.transaction(['books'], 'readwrite');
+        const store = transaction.objectStore('books');
+        store.add({ title, content });
+        transaction.oncomplete = () => {
+          alert('Book saved!');
+          displayBooks();
+        };
+      } else {
+        alert('Please fill in both title and content.');
+      }
+    });
+
+    // Display books
+    function displayBooks() {
+      const bookList = document.getElementById('book-list');
+      bookList.innerHTML = '';
+
+      const transaction = db.transaction(['books'], 'readonly');
+      const store = transaction.objectStore('books');
+      const request = store.openCursor();
+
+      request.onsuccess = function(event) {
+        const cursor = event.target.result;
+        if (cursor) {
+          const book = cursor.value;
+          const bookItem = document.createElement('div');
+          bookItem.className = 'book-item';
+          bookItem.innerHTML = `
+            <h3>${book.title}</h3>
+            <p>${book.content}</p>
+            <div class="controls">
+              <button onclick="readBook('${book.content}')">Read</button>
+              <button onclick="deleteBook(${book.id})">Delete</button>
+            </div>
+          `;
+          bookList.appendChild(bookItem);
+          cursor.continue();
+        }
+      };
+    }
+
+    // Read book (TTS)
+    function readBook(content) {
+      const synth = window.speechSynthesis;
+      const utterance = new SpeechSynthesisUtterance(content);
+      synth.speak(utterance);
+    }
+
+    // Delete book
+    function deleteBook(id) {
+      const transaction = db.transaction(['books'], 'readwrite');
+      const store = transaction.objectStore('books');
+      store.delete(id);
+      transaction.oncomplete = () => {
+        alert('Book deleted!');
+        displayBooks();
+      };
+    }
+  </script>
+</body>
+</html>
